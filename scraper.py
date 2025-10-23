@@ -1,7 +1,7 @@
 import re
 from urllib.parse import urljoin, urlparse
 from bs4 import BeautifulSoup
-from reporting import analyzer
+from analysis import analyzer
 
 FILE_EXTENSION_PATTERN = re.compile(
     r".*\.(css|js|bmp|gif|jpe?g|ico"
@@ -20,17 +20,30 @@ ALLOWED_DOMAINS = {
 }
 
 def scraper(url, resp):
+    if analyzer.is_url_visited(url):
+        print(f"Skipping duplicate URL: {url}")
+        return []
+        
     links = extract_next_links(url, resp)
     
     if resp.status == 200 and resp.raw_response and resp.raw_response.content:
         try:
             content = resp.raw_response.content.decode('utf-8', errors='ignore')
             analyzer.add_page(url, content)
-            
         except Exception as e:
-            print(f"error in reporting, {e}")
+            analyzer.add_page(url)
+    else:
+        analyzer.add_page(url)
     
-    return [link for link in links if is_valid(link)]
+    valid_links = []
+    for link in links:
+        if is_valid(link):
+            if not analyzer.is_url_visited(link):
+                valid_links.append(link)
+            else:
+                print(f"Skipping already visited link: {link}")
+    
+    return valid_links
 
 def extract_next_links(url, resp):
     if resp.status != 200 or not resp.raw_response or not resp.raw_response.content:

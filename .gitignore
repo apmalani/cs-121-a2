@@ -108,3 +108,6 @@ venv.bak/
 
 *.full.py
 *.shelve
+
+Logs/
+crawler_report.txt

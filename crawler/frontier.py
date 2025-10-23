@@ -1,5 +1,6 @@
 import os
 import shelve
+import threading
 
 from threading import Thread, RLock
 from queue import Queue, Empty
@@ -12,6 +13,7 @@ class Frontier(object):
         self.logger = get_logger("FRONTIER")
         self.config = config
         self.to_be_downloaded = list()
+        self.frontier_lock = threading.RLock()
         
         if not os.path.exists(self.config.save_file) and not restart:
             # Save file does not exist, but request to load save.
@@ -37,36 +39,39 @@ class Frontier(object):
 
     def _parse_save_file(self):
         ''' This function can be overridden for alternate saving techniques. '''
-        total_count = len(self.save)
-        tbd_count = 0
-        for url, completed in self.save.values():
-            if not completed and is_valid(url):
-                self.to_be_downloaded.append(url)
-                tbd_count += 1
-        self.logger.info(
-            f"Found {tbd_count} urls to be downloaded from {total_count} "
-            f"total urls discovered.")
+        with self.frontier_lock:
+            total_count = len(self.save)
+            tbd_count = 0
+            for url, completed in self.save.values():
+                if not completed and is_valid(url):
+                    self.to_be_downloaded.append(url)
+                    tbd_count += 1
+            self.logger.info(
+                f"Found {tbd_count} urls to be downloaded from {total_count} "
+                f"total urls discovered.")
 
     def get_tbd_url(self):
-        try:
-            return self.to_be_downloaded.pop()
-        except IndexError:
-            return None
+        with self.frontier_lock:
+            try:
+                return self.to_be_downloaded.pop()
+            except IndexError:
+                return None
 
     def add_url(self, url):
-        url = normalize(url)
-        urlhash = get_urlhash(url)
-        if urlhash not in self.save:
-            self.save[urlhash] = (url, False)
-            self.save.sync()
-            self.to_be_downloaded.append(url)
+        with self.frontier_lock:
+            url = normalize(url)
+            urlhash = get_urlhash(url)
+            if urlhash not in self.save:
+                self.save[urlhash] = (url, False)
+                self.save.sync()
+                self.to_be_downloaded.append(url)
     
     def mark_url_complete(self, url):
-        urlhash = get_urlhash(url)
-        if urlhash not in self.save:
-            # This should not happen.
-            self.logger.error(
-                f"Completed url {url}, but have not seen it before.")
+        with self.frontier_lock:
+            urlhash = get_urlhash(url)
+            if urlhash not in self.save:
+                self.logger.error(
+                    f"Completed url {url}, but have not seen it before.")
 
-        self.save[urlhash] = (url, True)
-        self.save.sync()
+            self.save[urlhash] = (url, True)
+            self.save.sync()
