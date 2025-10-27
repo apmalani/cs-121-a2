@@ -33,3 +33,23 @@ def normalize(url):
     if url.endswith("/"):
         return url.rstrip("/")
     return url
+
+# used for loop-detection
+def get_subdomain(url):
+        '''returns up until the subdomain of a url assuming it has been normalized
+            example: get_subdomain(self, "https://ics.uci.edu/~eppstein/pix/ham/Sara2.html) will return
+            "https://ics.uci/edu/~eppstein/"
+        '''
+        parsed = urlparse(url)
+
+        scheme = parsed.scheme  # https
+        netloc = parsed.netloc  # ics.uci.edu
+        path = parsed.path  # /~eppstein/pix/ham/Sara2.html
+
+        if path.startswith('/') and len(path) > 1: # checks if there is even a subdomain to begin with
+            # if path = /~eppstein/pix/ham/Sara2.html, new path = /~eppstein/
+            path = "/" + path[1:].split("/")[0]+"/"
+
+        return f"{scheme}://{netloc}{path}"
+
+

@@ -60,7 +60,7 @@ class CrawlerAnalyzer:
             
         except Exception:
             return url.split('#')[0] if '#' in url else url
-    
+
     def set_politeness_delay(self, delay):
         self.politeness_delay = delay
     

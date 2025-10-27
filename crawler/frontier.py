@@ -5,7 +5,7 @@ import threading
 from threading import Thread, RLock
 from queue import Queue, Empty
 
-from utils import get_logger, get_urlhash, normalize
+from utils import get_logger, get_urlhash, normalize, get_subdomain
 from scraper import is_valid
 
 class Frontier(object):
@@ -14,6 +14,8 @@ class Frontier(object):
         self.config = config
         self.to_be_downloaded = list()
         self.frontier_lock = threading.RLock()
+        self.visited_subdomains: dict[str, int] = {} # keep track of visited subdomains to prevent traps
+        self.MAX_HITS: int = 200 # maximum amount of hits a subdomain can have before we begin to ignore it 
         
         if not os.path.exists(self.config.save_file) and not restart:
             # Save file does not exist, but request to load save.
@@ -43,7 +45,7 @@ class Frontier(object):
             total_count = len(self.save)
             tbd_count = 0
             for url, completed in self.save.values():
-                if not completed and is_valid(url):
+                if not completed and is_valid(url) and self.can_add(url):   # Restores visited subdomains from saved run
                     self.to_be_downloaded.append(url)
                     tbd_count += 1
             self.logger.info(
@@ -57,15 +59,32 @@ class Frontier(object):
             except IndexError:
                 return None
 
+    # helper method used to check if we haven't visited a subdomain too many times
+    def can_add(self, url) -> bool:
+        ''' checks if subdomain can be visited (we havent reached max hits); returns True and updates class dict
+            if haven't reached max, otherwise returns False
+            this method is not lock safe; please only call it when nested in another locked
+        '''
+        url_subdomain: str = get_subdomain(url)
+        if url_subdomain not in self.visited_subdomains:    # Haven't seen before
+            self.visited_subdomains[url_subdomain] = 1
+            return True
+        elif url_subdomain in self.visited_subdomains and self.visited_subdomains[url_subdomain] < self.MAX_HITS:   # Seen but hasn't reached max hits
+            self.visited_subdomains[url_subdomain] += 1
+            return True
+        else:
+            return False 
+
     def add_url(self, url):
         with self.frontier_lock:
-            url = normalize(url)
-            urlhash = get_urlhash(url)
-            if urlhash not in self.save:
-                self.save[urlhash] = (url, False)
-                self.save.sync()
-                self.to_be_downloaded.append(url)
-    
+            if self.can_add(url):     # Check if we haven't visited subdomain too many times already
+                url = normalize(url)
+                urlhash = get_urlhash(url)
+                if urlhash not in self.save:
+                    self.save[urlhash] = (url, False)
+                    self.save.sync()
+                    self.to_be_downloaded.append(url)
+
     def mark_url_complete(self, url):
         with self.frontier_lock:
             urlhash = get_urlhash(url)
