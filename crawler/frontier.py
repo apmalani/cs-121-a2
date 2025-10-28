@@ -15,7 +15,7 @@ class Frontier(object):
         self.to_be_downloaded = list()
         self.frontier_lock = threading.RLock()
         self.visited_subdomains: dict[str, int] = {} # keep track of visited subdomains to prevent traps
-        self.MAX_HITS: int = 200 # maximum amount of hits a subdomain can have before we begin to ignore it 
+        self.MAX_HITS: int = 1000 # maximum amount of hits a subdomain can have before we begin to ignore it 
         
         if not os.path.exists(self.config.save_file) and not restart:
             # Save file does not exist, but request to load save.

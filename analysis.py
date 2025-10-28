@@ -120,7 +120,12 @@ class CrawlerAnalyzer:
                     self.word_counts[word] += 1
     
     def process_content(self, content):
-        clean_text = re.sub(r'<[^>]+>', ' ', content)
+        # remov html tags, css properties, and script tags
+        clean_text = re.sub(r'<style[^>]*>.*?</style>', ' ', content, flags=re.DOTALL | re.IGNORECASE)
+        clean_text = re.sub(r'<script[^>]*>.*?</script>', ' ', clean_text, flags=re.DOTALL | re.IGNORECASE)
+        clean_text = re.sub(r'<[^>]+>', ' ', clean_text)    
+        clean_text = re.sub(r'[a-zA-Z-]+\s*:\s*[^;]+;?', ' ', clean_text)
+    
         words = re.findall(r'\b[a-zA-Z]+\b', clean_text.lower())
         filtered_words = [word for word in words if len(word) > 2 and word not in self.stopwords]
         return len(words), filtered_words
