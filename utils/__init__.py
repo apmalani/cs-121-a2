@@ -38,7 +38,7 @@ def normalize(url):
 def get_subdomain(url):
         '''returns up until the subdomain of a url assuming it has been normalized
             example: get_subdomain(self, "https://ics.uci.edu/~eppstein/pix/ham/Sara2.html) will return
-            "https://ics.uci/edu/~eppstein/"
+            "https://ics.uci/edu/~eppstein/pix"
         '''
         parsed = urlparse(url)
 
@@ -47,8 +47,12 @@ def get_subdomain(url):
         path = parsed.path  # /~eppstein/pix/ham/Sara2.html
 
         if path.startswith('/') and len(path) > 1: # checks if there is even a subdomain to begin with
-            # if path = /~eppstein/pix/ham/Sara2.html, new path = /~eppstein/
-            path = "/" + path[1:].split("/")[0]+"/"
+            split_path: list[str] = path[1:].split("/")
+
+            if(len(split_path) == 1):   # if path = /~eppstein/, new path is itself
+                path = "/" + split_path[0] + "/"
+            else:   # if path = /~eppstein/pix/ham/Sara2.html, new path = /~eppstein/pix/; can adjust for finer loop detection
+                path = "/" + split_path[0] + "/" + split_path[1] + "/"
 
         return f"{scheme}://{netloc}{path}"
 
