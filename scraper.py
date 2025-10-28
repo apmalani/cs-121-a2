@@ -1,7 +1,6 @@
 import re
 from urllib.parse import urljoin, urlparse
 from bs4 import BeautifulSoup
-from analysis import analyzer
 
 FILE_EXTENSION_PATTERN = re.compile(
     r".*\.(css|js|bmp|gif|jpe?g|ico"
@@ -19,8 +18,8 @@ ALLOWED_DOMAINS = {
     "informatics.uci.edu", "www.informatics.uci.edu", "stat.uci.edu", "www.stat.uci.edu"
 }
 
-def scraper(url, resp):
-    if analyzer.is_url_visited(url):
+def scraper(url, resp, frontier):
+    if frontier.is_url_visited(url):
         print(f"Skipping duplicate URL: {url}")
         return []
         
@@ -29,16 +28,16 @@ def scraper(url, resp):
     if resp.status == 200 and resp.raw_response and resp.raw_response.content:
         try:
             content = resp.raw_response.content.decode('utf-8', errors='ignore')
-            analyzer.add_page(url, content)
+            frontier.add_page(url, content)
         except Exception as e:
-            analyzer.add_page(url)
+            frontier.add_page(url)
     else:
-        analyzer.add_page(url)
+        frontier.add_page(url)
     
     valid_links = []
     for link in links:
         if is_valid(link):
-            if not analyzer.is_url_visited(link):
+            if not frontier.is_url_visited(link):
                 valid_links.append(link)
             else:
                 print(f"Skipping already visited link: {link}")

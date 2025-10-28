@@ -1,7 +1,9 @@
 import os
 import logging
+import re
 from hashlib import sha256
 from urllib.parse import urlparse
+from collections import Counter
 
 def get_logger(name, filename=None):
     logger = logging.getLogger(name)
@@ -30,9 +32,38 @@ def get_urlhash(url):
         f"{parsed.query}/{parsed.fragment}".encode("utf-8")).hexdigest()
 
 def normalize(url):
-    if url.endswith("/"):
-        return url.rstrip("/")
-    return url
+    """Normalize URL by removing fragments, converting to lowercase, removing www, and standardizing paths"""
+    try:
+        parsed = urlparse(url)
+        
+        if '#' in url:
+            url = url.split('#')[0]
+            parsed = urlparse(url)
+        
+        scheme = parsed.scheme.lower()
+        netloc = parsed.netloc.lower()
+        path = parsed.path
+        query = parsed.query
+        
+        if netloc.startswith('www.'):
+            netloc = netloc[4:]
+        
+        if path.endswith('/') and path != '/':
+            path = path.rstrip('/')
+        elif path == '':
+            path = '/'
+        
+        if scheme in ('http', 'https'):
+            scheme = 'https'
+        
+        normalized = f"{scheme}://{netloc}{path}"
+        if query:
+            normalized += f"?{query}"
+        
+        return normalized
+        
+    except Exception:
+        return url.split('#')[0] if '#' in url else url
 
 # used for loop-detection
 def get_subdomain(url):
@@ -55,5 +86,25 @@ def get_subdomain(url):
                 path = "/" + split_path[0] + "/" + split_path[1] + "/"
 
         return f"{scheme}://{netloc}{path}"
+
+
+def _load_stopwords():
+    """Load common English stopwords for text processing"""
+    stopwords_text = "a about above after again against all am an and any are aren't as at be because been before being below between both but by can't cannot could couldn't did didn't do does doesn't doing don't down during each few for from further had hadn't has hasn't have haven't having he he'd he'll he's her here here's hers herself him himself his how how's i i'd i'll i'm i've if in into is isn't it it's its itself let's me more most mustn't my myself no nor not of off on once only or other ought our ours ourselves out over own same shan't she she'd she'll she's should shouldn't so some such than that that's the their theirs them themselves then there there's these they they'd they'll they're they've this those through to under until up very was wasn't we we'd we'll we're we've were weren't what what's when when's where where's which while who who's whom why why's with won't would wouldn't you you'd you'll you're you've your yours yourself yourselves"
+    return set(stopwords_text.split())
+
+
+def process_content(content):
+    """Process HTML content to extract meaningful words, removing HTML tags, CSS, and scripts"""
+    # Remove HTML tags, CSS properties, and script tags
+    clean_text = re.sub(r'<style[^>]*>.*?</style>', ' ', content, flags=re.DOTALL | re.IGNORECASE)
+    clean_text = re.sub(r'<script[^>]*>.*?</script>', ' ', clean_text, flags=re.DOTALL | re.IGNORECASE)
+    clean_text = re.sub(r'<[^>]+>', ' ', clean_text)    
+    clean_text = re.sub(r'[a-zA-Z-]+\s*:\s*[^;]+;?', ' ', clean_text)
+
+    words = re.findall(r'\b[a-zA-Z]+\b', clean_text.lower())
+    stopwords = _load_stopwords()
+    filtered_words = [word for word in words if len(word) > 2 and word not in stopwords]
+    return len(words), filtered_words
 
 

@@ -2,7 +2,6 @@ from threading import Event
 from utils import get_logger
 from crawler.frontier import Frontier
 from crawler.worker import Worker
-from analysis import analyzer
 
 class Crawler(object):
     def __init__(self, config, restart, frontier_factory=Frontier, worker_factory=Worker):
@@ -14,7 +13,7 @@ class Crawler(object):
         self.stop_event = Event()
 
         if restart:
-            analyzer.reset()
+            self.frontier.reset_analysis()
 
     def start_async(self):
         self.workers = [
@@ -34,4 +33,4 @@ class Crawler(object):
         
         # Generate report once after all workers are done
         self.logger.info("All workers finished. Generating final report...")
-        analyzer.generate_report()
+        self.frontier.generate_report()

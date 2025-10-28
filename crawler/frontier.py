@@ -1,11 +1,14 @@
 import os
 import shelve
 import threading
+import time
+from collections import Counter, defaultdict
+from urllib.parse import urlparse
 
 from threading import Thread, RLock
 from queue import Queue, Empty
 
-from utils import get_logger, get_urlhash, normalize, get_subdomain
+from utils import get_logger, get_urlhash, normalize, get_subdomain, process_content
 from scraper import is_valid
 
 class Frontier(object):
@@ -16,6 +19,17 @@ class Frontier(object):
         self.frontier_lock = threading.RLock()
         self.visited_subdomains: dict[str, int] = {} # keep track of visited subdomains to prevent traps
         self.MAX_HITS: int = 1000 # maximum amount of hits a subdomain can have before we begin to ignore it 
+        
+        # Analysis and politeness functionality moved from analysis.py
+        self.unique_urls = set()
+        self.url_to_word_count = {}
+        self.subdomain_counts = defaultdict(int)
+        self.page_contents = {}
+        self.word_counts = Counter()
+        self.domain_last_request = {}
+        self.politeness_delay = None
+        self.politeness_lock = threading.Lock()
+        self.data_lock = threading.Lock()
         
         if not os.path.exists(self.config.save_file) and not restart:
             # Save file does not exist, but request to load save.
@@ -94,3 +108,122 @@ class Frontier(object):
 
             self.save[urlhash] = (url, True)
             self.save.sync()
+    
+    # Politeness functionality moved from analysis.py
+    def set_politeness_delay(self, delay):
+        """Set the politeness delay for domain requests"""
+        self.politeness_delay = delay
+    
+    def check_domain_politeness(self, url):
+        """Check and enforce politeness delay for domain requests"""
+        try:
+            if self.politeness_delay is None:
+                return True
+            
+            parsed = urlparse(url)
+            domain = parsed.netloc.lower()
+            
+            if not domain:
+                return True
+            
+            with self.politeness_lock:
+                current_time = time.time()
+                last_request_time = self.domain_last_request.get(domain, 0)
+                
+                time_since_last = current_time - last_request_time
+                
+                if time_since_last < self.politeness_delay:
+                    wait_time = self.politeness_delay - time_since_last
+                    print(f"Domain politeness: waiting {wait_time:.3f}s before requesting {domain}")
+                    time.sleep(wait_time)
+                    current_time = time.time()
+                
+                self.domain_last_request[domain] = current_time
+            
+            return True
+            
+        except Exception as e:
+            print(f"error checking domain politeness, {e}")
+            return True
+    
+    # Analysis functionality moved from analysis.py
+    def is_url_visited(self, url):
+        """Check if a URL has already been visited"""
+        normalized_url = normalize(url)
+        return normalized_url in self.unique_urls
+    
+    def add_page(self, url, content=None):
+        """Add a page to the analysis data"""
+        normalized_url = normalize(url)
+        
+        with self.data_lock:
+            if normalized_url not in self.unique_urls:
+                self.unique_urls.add(normalized_url)
+                
+                parsed = urlparse(normalized_url)
+                if parsed.netloc:
+                    self.subdomain_counts[parsed.netloc] += 1
+                
+                if content is not None:
+                    self.page_contents[normalized_url] = content
+                    
+                    word_count, filtered_words = process_content(content)
+                    
+                    self.url_to_word_count[normalized_url] = word_count
+                    
+                    for word in filtered_words:
+                        self.word_counts[word] += 1
+    
+    def get_unique_page_count(self):
+        """Get the count of unique pages visited"""
+        return len(self.unique_urls)
+    
+    def get_longest_page(self):
+        """Get the URL and word count of the longest page"""
+        if not self.url_to_word_count:
+            return None, 0
+        
+        longest_url = max(self.url_to_word_count, key=self.url_to_word_count.get)
+        return longest_url, self.url_to_word_count[longest_url]
+    
+    def get_most_common_words(self, n=50):
+        """Get the most common words across all pages"""
+        return self.word_counts.most_common(n)
+    
+    def get_subdomain_stats(self):
+        """Get statistics for UCI subdomains"""
+        uci_subdomains = {}
+        for subdomain, count in self.subdomain_counts.items():
+            if subdomain.endswith('.uci.edu'):
+                uci_subdomains[subdomain] = count
+        
+        return sorted(uci_subdomains.items())
+    
+    def generate_report(self, output_file="crawler_report.txt"):
+        """Generate a comprehensive crawler report"""
+        report_lines = []
+        
+        report_lines.append(f"unique pages found: {self.get_unique_page_count()}")
+        
+        report_lines.append(f"longest page: {self.get_longest_page()[0]} {self.get_longest_page()[1]}")
+        
+        report_lines.append("50 most common words:")
+        common_words = self.get_most_common_words(50)
+        for i, (word, count) in enumerate(common_words, 1):
+            report_lines.append(f"   {i:2d}. {word:<15} ({count} occurrences)")
+        report_lines.append("")
+        
+        report_lines.append(f"uci.edu subdomains: {self.get_subdomain_stats()}")
+        
+        with open(output_file, 'w', encoding='utf-8') as f:
+            f.write('\n'.join(report_lines))
+    
+    def reset_analysis(self):
+        """Reset all analysis data"""
+        with self.data_lock:
+            self.unique_urls.clear()
+            self.url_to_word_count.clear()
+            self.subdomain_counts.clear()
+            self.page_contents.clear()
+            self.word_counts.clear()
+            self.domain_last_request.clear()
