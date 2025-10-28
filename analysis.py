@@ -23,6 +23,7 @@ class CrawlerAnalyzer:
         self.domain_last_request = {}
         self.politeness_delay = None
         self.politeness_lock = threading.Lock()
+        self.data_lock = threading.Lock()
         
     def _load_stopwords(self):
         stopwords_text = "a about above after again against all am an and any are aren't as at be because been before being below between both but by can't cannot could couldn't did didn't do does doesn't doing don't down during each few for from further had hadn't has hasn't have haven't having he he'd he'll he's her here here's hers herself him himself his how how's i i'd i'll i'm i've if in into is isn't it it's its itself let's me more most mustn't my myself no nor not of off on once only or other ought our ours ourselves out over own same shan't she she'd she'll she's should shouldn't so some such than that that's the their theirs them themselves then there there's these they they'd they'll they're they've this those through to under until up very was wasn't we we'd we'll we're we've were weren't what what's when when's where where's which while who who's whom why why's with won't would wouldn't you you'd you'll you're you've your yours yourself yourselves"
@@ -102,22 +103,23 @@ class CrawlerAnalyzer:
     def add_page(self, url, content=None):
         normalized_url = self.normalize_url(url)
         
-        if normalized_url not in self.unique_urls:
-            self.unique_urls.add(normalized_url)
-            
-            parsed = urlparse(normalized_url)
-            if parsed.netloc:
-                self.subdomain_counts[parsed.netloc] += 1
-            
-            if content is not None:
-                self.page_contents[normalized_url] = content
+        with self.data_lock:
+            if normalized_url not in self.unique_urls:
+                self.unique_urls.add(normalized_url)
                 
-                word_count, filtered_words = self.process_content(content)
+                parsed = urlparse(normalized_url)
+                if parsed.netloc:
+                    self.subdomain_counts[parsed.netloc] += 1
                 
-                self.url_to_word_count[normalized_url] = word_count
-                
-                for word in filtered_words:
-                    self.word_counts[word] += 1
+                if content is not None:
+                    self.page_contents[normalized_url] = content
+                    
+                    word_count, filtered_words = self.process_content(content)
+                    
+                    self.url_to_word_count[normalized_url] = word_count
+                    
+                    for word in filtered_words:
+                        self.word_counts[word] += 1
     
     def process_content(self, content):
         # remov html tags, css properties, and script tags
@@ -152,14 +154,15 @@ class CrawlerAnalyzer:
         return sorted(uci_subdomains.items())
     
     def reset(self):
-        self.unique_urls.clear()
-        self.url_to_word_count.clear()
-        self.subdomain_counts.clear()
-        self.page_contents.clear()
-        self.word_counts.clear()
-        self.url_hashes.clear()
-        self.content_hashes.clear()
-        self.domain_last_request.clear()
+        with self.data_lock:
+            self.unique_urls.clear()
+            self.url_to_word_count.clear()
+            self.subdomain_counts.clear()
+            self.page_contents.clear()
+            self.word_counts.clear()
+            self.url_hashes.clear()
+            self.content_hashes.clear()
+            self.domain_last_request.clear()
     
     def generate_report(self, output_file="crawler_report.txt"):
         report_lines = []
