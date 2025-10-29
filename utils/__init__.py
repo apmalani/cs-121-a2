@@ -5,6 +5,13 @@ from hashlib import sha256
 from urllib.parse import urlparse
 from collections import Counter
 
+# Precompiled regex patterns for text processing
+_STYLE_TAG_RE = re.compile(r'<style[^>]*>.*?</style>', flags=re.DOTALL | re.IGNORECASE)
+_SCRIPT_TAG_RE = re.compile(r'<script[^>]*>.*?</script>', flags=re.DOTALL | re.IGNORECASE)
+_HTML_TAG_RE = re.compile(r'<[^>]+>')
+_CSS_PROP_RE = re.compile(r'[a-zA-Z-]+\s*:\s*[^;]+;?')
+_WORD_RE = re.compile(r'\b[a-zA-Z]+\b')
+
 def get_logger(name, filename=None):
     logger = logging.getLogger(name)
     logger.setLevel(logging.INFO)
@@ -96,13 +103,13 @@ def _load_stopwords():
 
 def process_content(content):
     """Process HTML content to extract meaningful words, removing HTML tags, CSS, and scripts"""
-    # Remove HTML tags, CSS properties, and script tags
-    clean_text = re.sub(r'<style[^>]*>.*?</style>', ' ', content, flags=re.DOTALL | re.IGNORECASE)
-    clean_text = re.sub(r'<script[^>]*>.*?</script>', ' ', clean_text, flags=re.DOTALL | re.IGNORECASE)
-    clean_text = re.sub(r'<[^>]+>', ' ', clean_text)    
-    clean_text = re.sub(r'[a-zA-Z-]+\s*:\s*[^;]+;?', ' ', clean_text)
+    # Precompiled regexes for performance
+    clean_text = _STYLE_TAG_RE.sub(' ', content)
+    clean_text = _SCRIPT_TAG_RE.sub(' ', clean_text)
+    clean_text = _HTML_TAG_RE.sub(' ', clean_text)
+    clean_text = _CSS_PROP_RE.sub(' ', clean_text)
 
-    words = re.findall(r'\b[a-zA-Z]+\b', clean_text.lower())
+    words = _WORD_RE.findall(clean_text.lower())
     stopwords = _load_stopwords()
     filtered_words = [word for word in words if len(word) > 2 and word not in stopwords]
     return len(words), filtered_words

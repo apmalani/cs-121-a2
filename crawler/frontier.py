@@ -29,7 +29,7 @@ class Frontier(object):
         self.domain_last_request = {}
         self.politeness_delay = None
         self.politeness_lock = threading.Lock()
-        self.data_lock = threading.Lock()
+        # Removed data_lock - using frontier_lock for all operations
         
         if not os.path.exists(self.config.save_file) and not restart:
             # Save file does not exist, but request to load save.
@@ -49,9 +49,20 @@ class Frontier(object):
         else:
             # Set the frontier state with contents of save file.
             self._parse_save_file()
+            self._load_analysis_data()  # Load analysis data from save file
             if not self.save:
                 for url in self.config.seed_urls:
                     self.add_url(url)
+
+        # Initialize subdomain counts for seed hosts to ensure they appear in report
+        try:
+            for seed_url in self.config.seed_urls:
+                parsed_seed = urlparse(seed_url)
+                host = parsed_seed.netloc.lower()
+                if host and host.endswith("uci.edu"):
+                    _ = self.subdomain_counts[host]  # touch to ensure key exists
+        except Exception:
+            pass
 
     def _parse_save_file(self):
         ''' This function can be overridden for alternate saving techniques. '''
@@ -65,6 +76,41 @@ class Frontier(object):
             self.logger.info(
                 f"Found {tbd_count} urls to be downloaded from {total_count} "
                 f"total urls discovered.")
+
+    def _load_analysis_data(self):
+        """Load analysis data from save file"""
+        with self.frontier_lock:
+            # Load unique URLs
+            if 'unique_urls' in self.save:
+                self.unique_urls = set(self.save['unique_urls'])
+            
+            # Load word counts
+            if 'word_counts' in self.save:
+                self.word_counts = Counter(self.save['word_counts'])
+            
+            # Load subdomain counts
+            if 'subdomain_counts' in self.save:
+                self.subdomain_counts = defaultdict(int, self.save['subdomain_counts'])
+            
+            # Load URL to word count mapping
+            if 'url_to_word_count' in self.save:
+                self.url_to_word_count = dict(self.save['url_to_word_count'])
+            
+            # Load page contents (optional, can be memory intensive)
+            if 'page_contents' in self.save:
+                self.page_contents = dict(self.save['page_contents'])
+            
+            self.logger.info(f"Loaded analysis data: {len(self.unique_urls)} unique URLs")
+
+    def _save_analysis_data(self):
+        """Save analysis data to save file"""
+        with self.frontier_lock:
+            self.save['unique_urls'] = list(self.unique_urls)
+            self.save['word_counts'] = dict(self.word_counts)
+            self.save['subdomain_counts'] = dict(self.subdomain_counts)
+            self.save['url_to_word_count'] = self.url_to_word_count
+            # Skip page_contents to save memory
+            self.save.sync()
 
     def get_tbd_url(self):
         with self.frontier_lock:
@@ -92,21 +138,22 @@ class Frontier(object):
     def add_url(self, url):
         with self.frontier_lock:
             if self.can_add(url):     # Check if we haven't visited subdomain too many times already
-                url = normalize(url)
-                urlhash = get_urlhash(url)
+                normalized_url = normalize(url)
+                urlhash = get_urlhash(normalized_url)  # Use normalized URL for hash
                 if urlhash not in self.save:
-                    self.save[urlhash] = (url, False)
+                    self.save[urlhash] = (normalized_url, False)  # Store normalized URL
                     self.save.sync()
-                    self.to_be_downloaded.append(url)
+                    self.to_be_downloaded.append(normalized_url)  # Queue normalized URL
 
     def mark_url_complete(self, url):
         with self.frontier_lock:
-            urlhash = get_urlhash(url)
+            normalized_url = normalize(url)  # Normalize for consistency
+            urlhash = get_urlhash(normalized_url)
             if urlhash not in self.save:
                 self.logger.error(
                     f"Completed url {url}, but have not seen it before.")
 
-            self.save[urlhash] = (url, True)
+            self.save[urlhash] = (normalized_url, True)
             self.save.sync()
     
     # Politeness functionality moved from analysis.py
@@ -147,22 +194,17 @@ class Frontier(object):
             return True
     
     # Analysis functionality moved from analysis.py
-    def is_url_visited(self, url):
-        """Check if a URL has already been visited"""
-        normalized_url = normalize(url)
-        return normalized_url in self.unique_urls
-    
-    def add_page(self, url, content=None):
-        """Add a page to the analysis data"""
-        normalized_url = normalize(url)
-        
-        with self.data_lock:
+    def add_page(self, normalized_url, content=None):
+        """Add a page to the analysis data using pre-normalized URL"""
+        with self.frontier_lock:
             if normalized_url not in self.unique_urls:
                 self.unique_urls.add(normalized_url)
                 
                 parsed = urlparse(normalized_url)
                 if parsed.netloc:
-                    self.subdomain_counts[parsed.netloc] += 1
+                    # Count by hostname (e.g., vision.ics.uci.edu), not scheme/path
+                    host = parsed.netloc.lower()
+                    self.subdomain_counts[host] += 1
                 
                 if content is not None:
                     self.page_contents[normalized_url] = content
@@ -173,6 +215,10 @@ class Frontier(object):
                     
                     for word in filtered_words:
                         self.word_counts[word] += 1
+                
+                # Save analysis data periodically (every 100 pages)
+                if len(self.unique_urls) % 100 == 0:
+                    self._save_analysis_data()
     
     def get_unique_page_count(self):
         """Get the count of unique pages visited"""
@@ -191,16 +237,19 @@ class Frontier(object):
         return self.word_counts.most_common(n)
     
     def get_subdomain_stats(self):
-        """Get statistics for UCI subdomains"""
+        """Get statistics for UCI subdomains as list[(host, count)] sorted alphabetically"""
         uci_subdomains = {}
-        for subdomain, count in self.subdomain_counts.items():
-            if subdomain.endswith('.uci.edu'):
-                uci_subdomains[subdomain] = count
-        
-        return sorted(uci_subdomains.items())
+        for host, count in self.subdomain_counts.items():
+            if host.endswith(".uci.edu") or host == "uci.edu":
+                uci_subdomains[host] = count
+        # Return alphabetically sorted by hostname
+        return sorted(uci_subdomains.items(), key=lambda item: item[0])
     
     def generate_report(self, output_file="crawler_report.txt"):
         """Generate a comprehensive crawler report"""
+        # Save final analysis data
+        self._save_analysis_data()
+        
         report_lines = []
         
         report_lines.append(f"unique pages found: {self.get_unique_page_count()}")
@@ -213,14 +262,17 @@ class Frontier(object):
             report_lines.append(f"   {i:2d}. {word:<15} ({count} occurrences)")
         report_lines.append("")
         
-        report_lines.append(f"uci.edu subdomains: {self.get_subdomain_stats()}")
+        # Print subdomains in required format: "subdomain, number" sorted alphabetically
+        report_lines.append("uci.edu subdomains:")
+        for host, count in self.get_subdomain_stats():
+            report_lines.append(f"{host}, {count}")
         
         with open(output_file, 'w', encoding='utf-8') as f:
             f.write('\n'.join(report_lines))
     
     def reset_analysis(self):
         """Reset all analysis data"""
-        with self.data_lock:
+        with self.frontier_lock:
             self.unique_urls.clear()
             self.url_to_word_count.clear()
             self.subdomain_counts.clear()

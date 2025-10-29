@@ -1,6 +1,7 @@
 import re
 from urllib.parse import urljoin, urlparse
 from bs4 import BeautifulSoup
+from utils import normalize
 
 FILE_EXTENSION_PATTERN = re.compile(
     r".*\.(css|js|bmp|gif|jpe?g|ico"
@@ -19,7 +20,10 @@ ALLOWED_DOMAINS = {
 }
 
 def scraper(url, resp, frontier):
-    if frontier.is_url_visited(url):
+    # URL is already normalized when it comes from frontier
+    normalized_url = url
+    
+    if normalized_url in frontier.unique_urls:
         print(f"Skipping duplicate URL: {url}")
         return []
         
@@ -28,17 +32,18 @@ def scraper(url, resp, frontier):
     if resp.status == 200 and resp.raw_response and resp.raw_response.content:
         try:
             content = resp.raw_response.content.decode('utf-8', errors='ignore')
-            frontier.add_page(url, content)
+            frontier.add_page(normalized_url, content)
         except Exception as e:
-            frontier.add_page(url)
+            frontier.add_page(normalized_url)
     else:
-        frontier.add_page(url)
+        frontier.add_page(normalized_url)
     
     valid_links = []
     for link in links:
         if is_valid(link):
-            if not frontier.is_url_visited(link):
-                valid_links.append(link)
+            normalized_link = normalize(link)
+            if normalized_link not in frontier.unique_urls:
+                valid_links.append(link)  # Return original link for frontier.add_url
             else:
                 print(f"Skipping already visited link: {link}")
     
@@ -83,7 +88,8 @@ def is_valid(url):
         if parsed.scheme not in ("http", "https"):
             return False
 
-        if parsed.netloc.lower() not in ALLOWED_DOMAINS:
+        netloc_lower = parsed.netloc.lower()
+        if netloc_lower not in ALLOWED_DOMAINS and not (netloc_lower.endswith('.uci.edu') or netloc_lower == 'uci.edu'):
             return False
         
         if FILE_EXTENSION_PATTERN.match(parsed.path.lower()):
