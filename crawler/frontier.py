@@ -59,8 +59,11 @@ class Frontier(object):
             for seed_url in self.config.seed_urls:
                 parsed_seed = urlparse(seed_url)
                 host = parsed_seed.netloc.lower()
-                if host and host.endswith("uci.edu"):
-                    _ = self.subdomain_counts[host]  # touch to ensure key exists
+                if host and (host.endswith(".uci.edu") or host == "uci.edu"):
+                    # Remove www. prefix if present to match normalization
+                    if host.startswith("www."):
+                        host = host[4:]
+                    self.subdomain_counts[host] = self.subdomain_counts.get(host, 0)  # Initialize if not exists
         except Exception:
             pass
 

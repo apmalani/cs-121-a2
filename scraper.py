@@ -24,7 +24,6 @@ def scraper(url, resp, frontier):
     normalized_url = url
     
     if normalized_url in frontier.unique_urls:
-        print(f"Skipping duplicate URL: {url}")
         return []
         
     links = extract_next_links(url, resp)
@@ -44,8 +43,6 @@ def scraper(url, resp, frontier):
             normalized_link = normalize(link)
             if normalized_link not in frontier.unique_urls:
                 valid_links.append(link)  # Return original link for frontier.add_url
-            else:
-                print(f"Skipping already visited link: {link}")
     
     return valid_links
 
