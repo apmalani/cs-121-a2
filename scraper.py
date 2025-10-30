@@ -20,7 +20,7 @@ ALLOWED_DOMAINS = {
 }
 
 # Blacklisted words - URLs containing any of these should be skipped
-URL_BLACKLIST = {"week", "year", "month", "ical", "doku"}
+URL_BLACKLIST = {"week", "year", "month", "ical", "doku", "tribe"}
 
 def scraper(url, resp, frontier):
     # URL is already normalized when it comes from frontier
@@ -84,8 +84,9 @@ def is_valid(url):
     
     # Check if URL contains any blacklisted words (case-insensitive)
     url_lower = url.lower()
-    if any(blacklisted_word in url_lower for blacklisted_word in URL_BLACKLIST):
-        return False
+    for blacklisted_word in URL_BLACKLIST:
+        if blacklisted_word in url_lower:
+            return False
     
     try:
         parsed = urlparse(url)
@@ -97,10 +98,12 @@ def is_valid(url):
         if netloc_lower not in ALLOWED_DOMAINS and not (netloc_lower.endswith('.uci.edu') or netloc_lower == 'uci.edu'):
             return False
         
-        if FILE_EXTENSION_PATTERN.match(parsed.path.lower()):
+        path_lower = parsed.path.lower()  # Reuse lowercase path for both checks
+        if FILE_EXTENSION_PATTERN.match(path_lower):
             return False
             
-        if len(parsed.path.split('/')) > 10:
+        # Optimize depth check - count '/' instead of splitting
+        if path_lower.count('/') > 10:
             return False
         
         return True

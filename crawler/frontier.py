@@ -2,7 +2,7 @@ import os
 import shelve
 import threading
 import time
-from collections import Counter, defaultdict
+from collections import Counter, defaultdict, deque
 from urllib.parse import urlparse
 
 from threading import Thread, RLock
@@ -15,7 +15,7 @@ class Frontier(object):
     def __init__(self, config, restart):
         self.logger = get_logger("FRONTIER")
         self.config = config
-        self.to_be_downloaded = list()
+        self.to_be_downloaded = deque()  # Use deque for O(1) operations on both ends
         self.frontier_lock = threading.RLock()
         self.visited_subdomains: dict[str, int] = {} # keep track of visited subdomains to prevent traps
         self.MAX_HITS: int = 1000 # maximum amount of hits a subdomain can have before we begin to ignore it 
@@ -126,7 +126,8 @@ class Frontier(object):
     def get_tbd_url(self):
         with self.frontier_lock:
             try:
-                return self.to_be_downloaded.pop()
+                # Use popleft() with deque for O(1) FIFO - much faster than list.pop(0)
+                return self.to_be_downloaded.popleft()
             except IndexError:
                 return None
 
@@ -147,25 +148,33 @@ class Frontier(object):
             return False 
 
     def add_url(self, url):
+        # Do expensive operations outside the lock
+        normalized_url = normalize(url)
+        urlhash = get_urlhash(normalized_url)  # Use normalized URL for hash
+        
         with self.frontier_lock:
             if self.can_add(url):     # Check if we haven't visited subdomain too many times already
-                normalized_url = normalize(url)
-                urlhash = get_urlhash(normalized_url)  # Use normalized URL for hash
                 if urlhash not in self.save:
                     self.save[urlhash] = (normalized_url, False)  # Store normalized URL
-                    self.save.sync()
                     self.to_be_downloaded.append(normalized_url)  # Queue normalized URL
+                    # Sync less frequently to reduce lock contention - only every 10 URLs
+                    if len(self.to_be_downloaded) % 10 == 0:
+                        self.save.sync()
 
     def mark_url_complete(self, url):
+        # Do expensive operations outside the lock
+        normalized_url = normalize(url)  # Normalize for consistency
+        urlhash = get_urlhash(normalized_url)
+        
         with self.frontier_lock:
-            normalized_url = normalize(url)  # Normalize for consistency
-            urlhash = get_urlhash(normalized_url)
             if urlhash not in self.save:
                 self.logger.error(
                     f"Completed url {url}, but have not seen it before.")
 
             self.save[urlhash] = (normalized_url, True)
-            self.save.sync()
+            # Sync less frequently - batch sync operations
+            if len(self.save) % 10 == 0:
+                self.save.sync()
     
     # Politeness functionality moved from analysis.py
     def set_politeness_delay(self, delay):
@@ -207,21 +216,27 @@ class Frontier(object):
     # Analysis functionality moved from analysis.py
     def add_page(self, normalized_url, content=None):
         """Add a page to the analysis data using pre-normalized URL"""
+        # CRITICAL: Do expensive content processing OUTSIDE the lock!
+        word_count = 0
+        filtered_words = []
+        if content is not None:
+            word_count, filtered_words = process_content(content)
+        
+        parsed = urlparse(normalized_url)
+        host = None
+        if parsed.netloc:
+            host = parsed.netloc.lower()
+        
         with self.frontier_lock:
             if normalized_url not in self.unique_urls:
                 self.unique_urls.add(normalized_url)
                 
-                parsed = urlparse(normalized_url)
-                if parsed.netloc:
+                if host:
                     # Count by hostname (e.g., vision.ics.uci.edu), not scheme/path
-                    host = parsed.netloc.lower()
                     self.subdomain_counts[host] += 1
                 
                 if content is not None:
                     self.page_contents[normalized_url] = content
-                    
-                    word_count, filtered_words = process_content(content)
-                    
                     self.url_to_word_count[normalized_url] = word_count
                     
                     for word in filtered_words:
