@@ -6,7 +6,7 @@ from utils.response import Response
 
 def download(url, config, logger=None):
     host, port = config.cache_server
-    timeout = 30  # 30 second timeout to prevent hanging on slow/frozen requests
+    timeout = 90  # 30 second timeout to prevent hanging on slow/frozen requests
     try:
         resp = requests.get(
             f"http://{host}:{port}/",

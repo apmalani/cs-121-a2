@@ -14,10 +14,13 @@ FILE_EXTENSION_PATTERN = re.compile(
     + r"|rm|smil|wmv|swf|wma|zip|rar|gz)$"
 )
 
-ALLOWED_DOMAINS = {
-    "ics.uci.edu", "www.ics.uci.edu", "cs.uci.edu", "www.cs.uci.edu",
-    "informatics.uci.edu", "www.informatics.uci.edu", "stat.uci.edu", "www.stat.uci.edu"
-}
+# Only allow these bases and their subdomains
+ALLOWED_SUFFIXES = (
+    "ics.uci.edu",
+    "cs.uci.edu",
+    "informatics.uci.edu",
+    "stat.uci.edu",
+)
 
 # Blacklisted words - URLs containing any of these should be skipped
 URL_BLACKLIST = {"week", "year", "month", "ical", "doku", "tribe"}
@@ -95,7 +98,13 @@ def is_valid(url):
             return False
 
         netloc_lower = parsed.netloc.lower()
-        if netloc_lower not in ALLOWED_DOMAINS and not (netloc_lower.endswith('.uci.edu') or netloc_lower == 'uci.edu'):
+        # Allow only the four specified bases (including www) and their subdomains
+        if not any(
+            netloc_lower == suffix or
+            netloc_lower == ("www." + suffix) or
+            netloc_lower.endswith('.' + suffix)
+            for suffix in ALLOWED_SUFFIXES
+        ):
             return False
         
         path_lower = parsed.path.lower()  # Reuse lowercase path for both checks
