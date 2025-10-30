@@ -4,7 +4,6 @@ from inspect import getsource
 from utils.download import download
 from utils import get_logger
 import scraper
-import time
 
 
 class Worker(Thread):

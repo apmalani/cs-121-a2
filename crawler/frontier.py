@@ -201,7 +201,7 @@ class Frontier(object):
                 
                 if time_since_last < self.politeness_delay:
                     wait_time = self.politeness_delay - time_since_last
-                    print(f"Domain politeness: waiting {wait_time:.3f}s before requesting {domain}")
+                    self.logger.debug(f"Domain politeness: waiting {wait_time:.3f}s before requesting {domain}")
                     time.sleep(wait_time)
                     current_time = time.time()
                 
@@ -210,7 +210,7 @@ class Frontier(object):
             return True
             
         except Exception as e:
-            print(f"error checking domain politeness, {e}")
+            self.logger.error(f"error checking domain politeness, {e}")
             return True
     
     # Analysis functionality moved from analysis.py

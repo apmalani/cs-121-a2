@@ -23,7 +23,8 @@ ALLOWED_SUFFIXES = (
 )
 
 # Blacklisted words - URLs containing any of these should be skipped
-URL_BLACKLIST = {"week", "year", "month", "ical", "doku", "tribe"}
+URL_BLACKLIST = {"week", "year", "month", "ical", "doku", "tribe", "twitter", "facebook", "instagram", "youtube"}
+_SKIP_SCHEMES = ("mailto:", "javascript:", "tel:")
 
 def scraper(url, resp, frontier):
     # URL is already normalized when it comes from frontier
@@ -63,16 +64,17 @@ def extract_next_links(url, resp):
         links = []
         for link in soup.find_all('a', href=True):
             href = link['href']
-            
+            if not href:
+                continue
+            low = href.lower()
+            if low.startswith(_SKIP_SCHEMES) or low.startswith('#'):
+                continue
+
             absolute_url = urljoin(resp.url, href)
-            
-            absolute_url = absolute_url.split('#')[0]
-            
-            if '?' in absolute_url:
-                has_real_params = '=' in absolute_url or '&' in absolute_url
-                if not has_real_params:
-                    absolute_url = absolute_url.split('?')[0]
-            
+            if '#' in absolute_url:
+                absolute_url = absolute_url.split('#', 1)[0]
+            if '?' in absolute_url and ('=' not in absolute_url and '&' not in absolute_url):
+                absolute_url = absolute_url.split('?', 1)[0]
             links.append(absolute_url)
             
     except Exception as e:
