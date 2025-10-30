@@ -35,14 +35,19 @@ def scraper(url, resp, frontier):
         
     links = extract_next_links(url, resp)
     
+    word_count = 0
     if resp.status == 200 and resp.raw_response and resp.raw_response.content:
         try:
             content = resp.raw_response.content.decode('utf-8', errors='ignore')
-            frontier.add_page(normalized_url, content)
+            word_count = frontier.add_page(normalized_url, content)
         except Exception as e:
-            frontier.add_page(normalized_url)
+            word_count = frontier.add_page(normalized_url)
     else:
-        frontier.add_page(normalized_url)
+        word_count = frontier.add_page(normalized_url)
+    
+    # Only add links to frontier if page has at least 50 words
+    if word_count < 50:
+        return []
     
     valid_links = []
     for link in links:

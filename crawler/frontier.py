@@ -235,7 +235,7 @@ class Frontier(object):
                     # Count by hostname (e.g., vision.ics.uci.edu), not scheme/path
                     self.subdomain_counts[host] += 1
                 
-                if content is not None:
+                if content is not None and word_count >= 50:
                     self.page_contents[normalized_url] = content
                     self.url_to_word_count[normalized_url] = word_count
                     
@@ -245,6 +245,8 @@ class Frontier(object):
                 # Save analysis data periodically (every 100 pages)
                 if len(self.unique_urls) % 100 == 0:
                     self._save_analysis_data()
+        
+        return word_count
     
     def get_unique_page_count(self):
         """Get the count of unique pages visited"""
