@@ -72,10 +72,18 @@ class Frontier(object):
         with self.frontier_lock:
             total_count = len(self.save)
             tbd_count = 0
-            for url, completed in self.save.values():
-                if not completed and is_valid(url) and self.can_add(url):   # Restores visited subdomains from saved run
-                    self.to_be_downloaded.append(url)
-                    tbd_count += 1
+            # Analysis data keys to skip
+            analysis_keys = {'unique_urls', 'word_counts', 'subdomain_counts', 'url_to_word_count', 'page_contents'}
+            for key, value in self.save.items():
+                # Skip analysis data entries - only process URL entries (which are tuples)
+                if key in analysis_keys:
+                    continue
+                # URL entries are stored as (normalized_url, completed) tuples
+                if isinstance(value, tuple) and len(value) == 2:
+                    url, completed = value
+                    if not completed and is_valid(url) and self.can_add(url):   # Restores visited subdomains from saved run
+                        self.to_be_downloaded.append(url)
+                        tbd_count += 1
             self.logger.info(
                 f"Found {tbd_count} urls to be downloaded from {total_count} "
                 f"total urls discovered.")

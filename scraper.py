@@ -19,6 +19,9 @@ ALLOWED_DOMAINS = {
     "informatics.uci.edu", "www.informatics.uci.edu", "stat.uci.edu", "www.stat.uci.edu"
 }
 
+# Blacklisted words - URLs containing any of these should be skipped
+URL_BLACKLIST = {"week", "year", "month", "ical", "doku"}
+
 def scraper(url, resp, frontier):
     # URL is already normalized when it comes from frontier
     normalized_url = url
@@ -77,6 +80,11 @@ def extract_next_links(url, resp):
 
 def is_valid(url):
     if len(url) > 200:
+        return False
+    
+    # Check if URL contains any blacklisted words (case-insensitive)
+    url_lower = url.lower()
+    if any(blacklisted_word in url_lower for blacklisted_word in URL_BLACKLIST):
         return False
     
     try:
