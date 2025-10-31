@@ -5,10 +5,8 @@ import time
 from collections import Counter, defaultdict, deque
 from urllib.parse import urlparse
 
-from threading import Thread, RLock
-from queue import Queue, Empty
 
-from utils import get_logger, get_urlhash, normalize, get_subdomain, process_content
+from utils import get_logger, get_urlhash, normalize, get_subdomain, process_content, calculate_page_fingerprint, is_duplicate
 from scraper import is_valid
 
 class Frontier(object):
@@ -29,7 +27,8 @@ class Frontier(object):
         self.domain_last_request = {}
         self.politeness_delay = None
         self.politeness_lock = threading.Lock()
-        # Removed data_lock - using frontier_lock for all operations
+        self.url_to_fingerprint = {}
+        self.duplicate_pages = set()        
         
         if not os.path.exists(self.config.save_file) and not restart:
             # Save file does not exist, but request to load save.
@@ -73,7 +72,7 @@ class Frontier(object):
             total_count = len(self.save)
             tbd_count = 0
             # Analysis data keys to skip
-            analysis_keys = {'unique_urls', 'word_counts', 'subdomain_counts', 'url_to_word_count', 'page_contents'}
+            analysis_keys = {'unique_urls', 'word_counts', 'subdomain_counts', 'url_to_word_count', 'page_contents', 'url_to_fingerprint', 'duplicate_pages'}
             for key, value in self.save.items():
                 # Skip analysis data entries - only process URL entries (which are tuples)
                 if key in analysis_keys:
@@ -111,6 +110,14 @@ class Frontier(object):
             if 'page_contents' in self.save:
                 self.page_contents = dict(self.save['page_contents'])
             
+            # Load fingerprints for similarity detection
+            if 'url_to_fingerprint' in self.save:
+                self.url_to_fingerprint = dict(self.save['url_to_fingerprint'])
+            
+            # Load duplicate pages
+            if 'duplicate_pages' in self.save:
+                self.duplicate_pages = set(self.save['duplicate_pages'])
+            
             self.logger.info(f"Loaded analysis data: {len(self.unique_urls)} unique URLs")
 
     def _save_analysis_data(self):
@@ -121,6 +128,8 @@ class Frontier(object):
             self.save['subdomain_counts'] = dict(self.subdomain_counts)
             self.save['url_to_word_count'] = self.url_to_word_count
             # Skip page_contents to save memory
+            self.save['url_to_fingerprint'] = dict(self.url_to_fingerprint)
+            self.save['duplicate_pages'] = list(self.duplicate_pages)
             self.save.sync()
 
     def get_tbd_url(self):
@@ -213,6 +222,23 @@ class Frontier(object):
             self.logger.error(f"error checking domain politeness, {e}")
             return True
     
+    # Similarity detection helper
+    def _check_if_duplicate(self, fingerprint, normalized_url):
+        """
+        Check if a page is a duplicate based on its fingerprint.
+        Returns True if similar to existing page.
+        """
+        if fingerprint == 0:
+            return False
+        
+        # Compare against all existing fingerprints
+        for existing_url, existing_fingerprint in self.url_to_fingerprint.items():
+            if existing_url != normalized_url and existing_fingerprint != 0:
+                if is_duplicate(fingerprint, existing_fingerprint):
+                    return True
+        
+        return False
+    
     # Analysis functionality moved from analysis.py
     def add_page(self, normalized_url, content=None):
         """Add a page to the analysis data using pre-normalized URL"""
@@ -221,6 +247,10 @@ class Frontier(object):
         filtered_words = []
         if content is not None:
             word_count, filtered_words = process_content(content)
+        
+        fingerprint = None
+        if content is not None and word_count >= 50:
+            fingerprint = calculate_page_fingerprint(content)
         
         parsed = urlparse(normalized_url)
         host = None
@@ -236,6 +266,14 @@ class Frontier(object):
                     self.subdomain_counts[host] += 1
                 
                 if content is not None and word_count >= 50:
+                    is_duplicate_page = self._check_if_duplicate(fingerprint, normalized_url)
+                    
+                    if is_duplicate_page:
+                        self.duplicate_pages.add(normalized_url)
+                        self.logger.debug(f"Duplicate page detected: {normalized_url}")
+                        return word_count
+                    
+                    self.url_to_fingerprint[normalized_url] = fingerprint
                     self.page_contents[normalized_url] = content
                     self.url_to_word_count[normalized_url] = word_count
                     
@@ -307,3 +345,5 @@ class Frontier(object):
             self.page_contents.clear()
             self.word_counts.clear()
             self.domain_last_request.clear()
+            self.url_to_fingerprint.clear()
+            self.duplicate_pages.clear()

@@ -67,25 +67,25 @@ def normalize(url):
 
 # used for loop-detection
 def get_subdomain(url):
-        '''returns up until the subdomain of a url assuming it has been normalized
-            example: get_subdomain(self, "https://ics.uci.edu/~eppstein/pix/ham/Sara2.html) will return
-            "https://ics.uci/edu/~eppstein/pix"
-        '''
-        parsed = urlparse(url)
+    '''returns up until the subdomain of a url assuming it has been normalized
+        example: get_subdomain(self, "https://ics.uci.edu/~eppstein/pix/ham/Sara2.html) will return
+        "https://ics.uci/edu/~eppstein/pix"
+    '''
+    parsed = urlparse(url)
 
-        scheme = parsed.scheme  # https
-        netloc = parsed.netloc  # ics.uci.edu
-        path = parsed.path  # /~eppstein/pix/ham/Sara2.html
+    scheme = parsed.scheme  # https
+    netloc = parsed.netloc  # ics.uci.edu
+    path = parsed.path  # /~eppstein/pix/ham/Sara2.html
 
-        if path.startswith('/') and len(path) > 1: # checks if there is even a subdomain to begin with
-            split_path: list[str] = path[1:].split("/")
+    if path.startswith('/') and len(path) > 1: # checks if there is even a subdomain to begin with
+        split_path: list[str] = path[1:].split("/")
 
-            if(len(split_path) == 1):   # if path = /~eppstein/, new path is itself
-                path = "/" + split_path[0] + "/"
-            else:   # if path = /~eppstein/pix/ham/Sara2.html, new path = /~eppstein/pix/; can adjust for finer loop detection
-                path = "/" + split_path[0] + "/" + split_path[1] + "/"
+        if(len(split_path) == 1):   # if path = /~eppstein/, new path is itself
+            path = "/" + split_path[0] + "/"
+        else:   # if path = /~eppstein/pix/ham/Sara2.html, new path = /~eppstein/pix/; can adjust for finer loop detection
+            path = "/" + split_path[0] + "/" + split_path[1] + "/"
 
-        return f"{scheme}://{netloc}{path}"
+    return f"{scheme}://{netloc}{path}"
 
 
 def _load_stopwords():
@@ -107,4 +107,87 @@ def process_content(content):
     filtered_words = [word for word in words if len(word) > 2 and word not in stopwords]
     return len(words), filtered_words
 
+
+def compute_simhash(content, hash_bits=64):
+    """
+    Compute SimHash fingerprint for content.
+    Returns an integer hash representing the page.
+    """
+    if not content:
+        return 0
+    
+    try:
+        soup = BeautifulSoup(content, "lxml")
+        for tag in soup(["script", "style", "noscript", "header", "footer", "nav"]):
+            tag.decompose()
+        text = soup.get_text(" ", strip=True)
+        
+        words = text.lower().split()
+        stopwords = _load_stopwords()
+        features = [w for w in words if len(w) > 2 and w not in stopwords]
+        
+        if not features:
+            return 0
+        
+        bit_counts = [0] * hash_bits
+        
+        for word in features:
+            word_hash = hash(word) & ((1 << hash_bits) - 1)
+            for i in range(hash_bits):
+                if word_hash & (1 << i):
+                    bit_counts[i] += 1
+                else:
+                    bit_counts[i] -= 1
+        simhash = 0
+
+        for i in range(hash_bits):
+            if bit_counts[i] >= 0:
+                simhash |= (1 << i)
+                
+        return simhash
+    except Exception:
+        return 0
+
+
+def calculate_page_fingerprint(content):
+    """
+    Calculate a fingerprint for a page using SimHash.
+    Returns an integer hash.
+    """
+    return compute_simhash(content)
+
+
+def hamming_distance(hash1, hash2):
+    """
+    Calculate Hamming distance between two hashes.
+    Returns number of differing bits.
+    """
+    if hash1 == 0 and hash2 == 0:
+        return 0
+    
+    # XOR to find differing bits
+    diff = hash1 ^ hash2
+    
+    # Count set bits
+    count = 0
+    while diff:
+        count += diff & 1
+        diff >>= 1
+    
+    return count
+
+
+def is_duplicate(fingerprint1, fingerprint2, max_distance=3):
+    """
+    Check if two page fingerprints are duplicates using Hamming distance.
+    Returns True if Hamming distance <= max_distance (default 3).
+    """
+    if fingerprint1 == 0 and fingerprint2 == 0:
+        return False
+    
+    if fingerprint1 == 0 or fingerprint2 == 0:
+        return False
+    
+    distance = hamming_distance(fingerprint1, fingerprint2)
+    return distance <= max_distance
 
