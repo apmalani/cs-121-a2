@@ -6,7 +6,7 @@ from collections import Counter, defaultdict, deque
 from urllib.parse import urlparse
 
 
-from utils import get_logger, get_urlhash, normalize, get_subdomain, process_content, calculate_page_fingerprint, is_duplicate
+from utils import get_logger, get_urlhash, normalize, get_subdomain, process_content, calculate_page_fingerprint, is_duplicate, get_deepest_link
 from scraper import is_valid
 
 class Frontier(object):
@@ -15,8 +15,11 @@ class Frontier(object):
         self.config = config
         self.to_be_downloaded = deque()  # Use deque for O(1) operations on both ends
         self.frontier_lock = threading.RLock()
+
+        # For tracking "good" domains
         self.visited_subdomains: dict[str, int] = {} # keep track of visited subdomains to prevent traps
         self.MAX_HITS: int = 1000 # maximum amount of hits a subdomain can have before we begin to ignore it 
+        self.low_info_dirs: set[str] = set()    # stores low info directories
         
         # Analysis and politeness functionality moved from analysis.py
         self.unique_urls = set()
@@ -142,15 +145,15 @@ class Frontier(object):
 
     # helper method used to check if we haven't visited a subdomain too many times
     def can_add(self, url) -> bool:
-        ''' checks if subdomain can be visited (we havent reached max hits); returns True and updates class dict
+        ''' checks if subdomain can be visited (we havent reached max hits) + not low info; returns True and updates class dict
             if haven't reached max, otherwise returns False
             this method is not lock safe; please only call it when nested in another locked
         '''
         url_subdomain: str = get_subdomain(url)
-        if url_subdomain not in self.visited_subdomains:    # Haven't seen before
+        if url_subdomain not in self.visited_subdomains and get_deepest_link(url) not in self.low_info_dirs:    # Haven't seen before
             self.visited_subdomains[url_subdomain] = 1
             return True
-        elif url_subdomain in self.visited_subdomains and self.visited_subdomains[url_subdomain] < self.MAX_HITS:   # Seen but hasn't reached max hits
+        elif url_subdomain in self.visited_subdomains and self.visited_subdomains[url_subdomain] < self.MAX_HITS and get_deepest_link(url) not in self.low_info_dirs:   # Seen but hasn't reached max hits
             self.visited_subdomains[url_subdomain] += 1
             return True
         else:
@@ -279,6 +282,15 @@ class Frontier(object):
                     
                     for word in filtered_words:
                         self.word_counts[word] += 1
+
+                elif content is not None and word_count < 50:   # For low-value pages, retrieve their path and black-list it
+                    link_without_page: str = get_deepest_link(normalized_url)
+                    url_path: list[str] = urlparse(link_without_page).path
+
+                    if(len(url_path) > 1):
+                        split_path = url_path[1:].split("/")
+                        if(len(split_path) >= 3):    # can change this
+                            self.low_info_dirs.add(link_without_page)                
                 
                 # Save analysis data periodically (every 100 pages)
                 if len(self.unique_urls) % 100 == 0:

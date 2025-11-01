@@ -66,7 +66,7 @@ def normalize(url):
         return url.split('#')[0] if '#' in url else url
 
 # used for loop-detection
-def get_subdomain(url):
+def get_subdomain(url) -> str:
     '''returns up until the subdomain of a url assuming it has been normalized
         example: get_subdomain(self, "https://ics.uci.edu/~eppstein/pix/ham/Sara2.html) will return
         "https://ics.uci/edu/~eppstein/pix"
@@ -84,6 +84,28 @@ def get_subdomain(url):
             path = "/" + split_path[0] + "/"
         else:   # if path = /~eppstein/pix/ham/Sara2.html, new path = /~eppstein/pix/; can adjust for finer loop detection
             path = "/" + split_path[0] + "/" + split_path[1] + "/"
+
+    return f"{scheme}://{netloc}{path}"
+
+def get_deepest_link(url) -> str:
+    '''returns the deepest link of a url without the html file'''
+    parsed = urlparse(url)
+
+    scheme = parsed.scheme # https
+    netloc = parsed.netloc 
+    path = parsed.path
+
+    if path.startswith('/') and len(path) > 1:
+        split_path: list[str] = path[1:].split("/")
+    else:
+        split_path = []
+        
+    if(len(split_path) <= 1):   # if url has no directories and is just html page
+        path = "/"
+    else:
+        path = "/"
+        for i in range(0, len(split_path) - 1):
+            path += split_path[i] + "/"
 
     return f"{scheme}://{netloc}{path}"
 
