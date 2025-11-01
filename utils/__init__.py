@@ -126,7 +126,12 @@ def process_content(content):
 
     words = _WORD_RE.findall(text.lower())
     stopwords = _load_stopwords()
-    filtered_words = [word for word in words if len(word) > 2 and word not in stopwords]
+
+    filtered_words = []
+    for word in words:
+        if len(word) > 2 and word not in stopwords:
+            filtered_words.append(word)
+
     return len(words), filtered_words
 
 
@@ -146,7 +151,11 @@ def compute_simhash(content, hash_bits=64):
         
         words = text.lower().split()
         stopwords = _load_stopwords()
-        features = [w for w in words if len(w) > 2 and w not in stopwords]
+
+        features = []
+        for word in words:
+            if len(word) > 2 and word not in stopwords:
+                features.append(word)
         
         if not features:
             return 0
