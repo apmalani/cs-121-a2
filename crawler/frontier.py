@@ -13,15 +13,13 @@ class Frontier(object):
     def __init__(self, config, restart):
         self.logger = get_logger("FRONTIER")
         self.config = config
-        self.to_be_downloaded = deque()  # Use deque for O(1) operations on both ends
+        self.to_be_downloaded = deque()
         self.frontier_lock = threading.RLock()
 
-        # For tracking "good" domains
         self.visited_subdomains: dict[str, int] = {} # keep track of visited subdomains to prevent traps
         self.MAX_HITS: int = 1000 # maximum amount of hits a subdomain can have before we begin to ignore it 
         self.low_info_dirs: set[str] = set()    # stores low info directories
         
-        # Analysis and politeness functionality moved from analysis.py
         self.unique_urls = set()
         self.url_to_word_count = {}
         self.subdomain_counts = defaultdict(int)
@@ -34,38 +32,32 @@ class Frontier(object):
         self.duplicate_pages = set()        
         
         if not os.path.exists(self.config.save_file) and not restart:
-            # Save file does not exist, but request to load save.
             self.logger.info(
                 f"Did not find save file {self.config.save_file}, "
                 f"starting from seed.")
         elif os.path.exists(self.config.save_file) and restart:
-            # Save file does exists, but request to start from seed.
             self.logger.info(
                 f"Found save file {self.config.save_file}, deleting it.")
             os.remove(self.config.save_file)
-        # Load existing save file, or create one if it does not exist.
         self.save = shelve.open(self.config.save_file)
         if restart:
             for url in self.config.seed_urls:
                 self.add_url(url)
         else:
-            # Set the frontier state with contents of save file.
             self._parse_save_file()
-            self._load_analysis_data()  # Load analysis data from save file
+            self._load_analysis_data()
             if not self.save:
                 for url in self.config.seed_urls:
                     self.add_url(url)
 
-        # Initialize subdomain counts for seed hosts to ensure they appear in report
         try:
             for seed_url in self.config.seed_urls:
                 parsed_seed = urlparse(seed_url)
                 host = parsed_seed.netloc.lower()
                 if host and (host.endswith(".uci.edu") or host == "uci.edu"):
-                    # Remove www. prefix if present to match normalization
                     if host.startswith("www."):
                         host = host[4:]
-                    self.subdomain_counts[host] = self.subdomain_counts.get(host, 0)  # Initialize if not exists
+                    self.subdomain_counts[host] = self.subdomain_counts.get(host, 0)
         except Exception:
             pass
 
@@ -74,16 +66,13 @@ class Frontier(object):
         with self.frontier_lock:
             total_count = len(self.save)
             tbd_count = 0
-            # Analysis data keys to skip
             analysis_keys = {'unique_urls', 'word_counts', 'subdomain_counts', 'url_to_word_count', 'page_contents', 'url_to_fingerprint', 'duplicate_pages'}
             for key, value in self.save.items():
-                # Skip analysis data entries - only process URL entries (which are tuples)
                 if key in analysis_keys:
                     continue
-                # URL entries are stored as (normalized_url, completed) tuples
-                if isinstance(value, tuple) and len(value) == 2:
+                if isinstance(value, tuple) and len(value) == 2:  # (normalized_url, completed) tuple
                     url, completed = value
-                    if not completed and is_valid(url) and self.can_add(url):   # Restores visited subdomains from saved run
+                    if not completed and is_valid(url) and self.can_add(url):
                         self.to_be_downloaded.append(url)
                         tbd_count += 1
             self.logger.info(
@@ -93,31 +82,24 @@ class Frontier(object):
     def _load_analysis_data(self):
         """Load analysis data from save file"""
         with self.frontier_lock:
-            # Load unique URLs
             if 'unique_urls' in self.save:
                 self.unique_urls = set(self.save['unique_urls'])
             
-            # Load word counts
             if 'word_counts' in self.save:
                 self.word_counts = Counter(self.save['word_counts'])
             
-            # Load subdomain counts
             if 'subdomain_counts' in self.save:
                 self.subdomain_counts = defaultdict(int, self.save['subdomain_counts'])
             
-            # Load URL to word count mapping
             if 'url_to_word_count' in self.save:
                 self.url_to_word_count = dict(self.save['url_to_word_count'])
             
-            # Load page contents (optional, can be memory intensive)
             if 'page_contents' in self.save:
                 self.page_contents = dict(self.save['page_contents'])
             
-            # Load fingerprints for similarity detection
             if 'url_to_fingerprint' in self.save:
                 self.url_to_fingerprint = dict(self.save['url_to_fingerprint'])
             
-            # Load duplicate pages
             if 'duplicate_pages' in self.save:
                 self.duplicate_pages = set(self.save['duplicate_pages'])
             
@@ -130,7 +112,6 @@ class Frontier(object):
             self.save['word_counts'] = dict(self.word_counts)
             self.save['subdomain_counts'] = dict(self.subdomain_counts)
             self.save['url_to_word_count'] = self.url_to_word_count
-            # Skip page_contents to save memory
             self.save['url_to_fingerprint'] = dict(self.url_to_fingerprint)
             self.save['duplicate_pages'] = list(self.duplicate_pages)
             self.save.sync()
@@ -138,44 +119,41 @@ class Frontier(object):
     def get_tbd_url(self):
         with self.frontier_lock:
             try:
-                # Use popleft() with deque for O(1) FIFO - much faster than list.pop(0)
                 return self.to_be_downloaded.popleft()
             except IndexError:
                 return None
 
-    # helper method used to check if we haven't visited a subdomain too many times
     def can_add(self, url) -> bool:
         ''' checks if subdomain can be visited (we havent reached max hits) + not low info; returns True and updates class dict
             if haven't reached max, otherwise returns False
             this method is not lock safe; please only call it when nested in another locked
         '''
         url_subdomain: str = get_subdomain(url)
-        if url_subdomain not in self.visited_subdomains and get_deepest_link(url) not in self.low_info_dirs:    # Haven't seen before
+        # First visit: add if not in low-info dir
+        if url_subdomain not in self.visited_subdomains and get_deepest_link(url) not in self.low_info_dirs:
             self.visited_subdomains[url_subdomain] = 1
             return True
-        elif url_subdomain in self.visited_subdomains and self.visited_subdomains[url_subdomain] < self.MAX_HITS and get_deepest_link(url) not in self.low_info_dirs:   # Seen but hasn't reached max hits
+        # Subsequent visit: check if under limit and not low-info
+        elif url_subdomain in self.visited_subdomains and self.visited_subdomains[url_subdomain] < self.MAX_HITS and get_deepest_link(url) not in self.low_info_dirs:
             self.visited_subdomains[url_subdomain] += 1
             return True
         else:
             return False 
 
     def add_url(self, url):
-        # Do expensive operations outside the lock
         normalized_url = normalize(url)
-        urlhash = get_urlhash(normalized_url)  # Use normalized URL for hash
+        urlhash = get_urlhash(normalized_url)  # hash used as key in save file
         
         with self.frontier_lock:
-            if self.can_add(url):     # Check if we haven't visited subdomain too many times already
-                if urlhash not in self.save:
-                    self.save[urlhash] = (normalized_url, False)  # Store normalized URL
-                    self.to_be_downloaded.append(normalized_url)  # Queue normalized URL
-                    # Sync less frequently to reduce lock contention - only every 10 URLs
-                    if len(self.to_be_downloaded) % 10 == 0:
+            if self.can_add(url):  # check subdomain limits and low-info dirs
+                if urlhash not in self.save:  # avoid duplicates
+                    self.save[urlhash] = (normalized_url, False)  # False = not yet downloaded
+                    self.to_be_downloaded.append(normalized_url)
+                    if len(self.to_be_downloaded) % 10 == 0:  # batch sync to reduce I/O
                         self.save.sync()
 
     def mark_url_complete(self, url):
-        # Do expensive operations outside the lock
-        normalized_url = normalize(url)  # Normalize for consistency
+        normalized_url = normalize(url)
         urlhash = get_urlhash(normalized_url)
         
         with self.frontier_lock:
@@ -183,12 +161,10 @@ class Frontier(object):
                 self.logger.error(
                     f"Completed url {url}, but have not seen it before.")
 
-            self.save[urlhash] = (normalized_url, True)
-            # Sync less frequently - batch sync operations
-            if len(self.save) % 10 == 0:
+            self.save[urlhash] = (normalized_url, True)  # True = download completed
+            if len(self.save) % 10 == 0:  # batch sync to reduce I/O
                 self.save.sync()
     
-    # Politeness functionality moved from analysis.py
     def set_politeness_delay(self, delay):
         """Set the politeness delay for domain requests"""
         self.politeness_delay = delay
@@ -211,13 +187,13 @@ class Frontier(object):
                 
                 time_since_last = current_time - last_request_time
                 
-                if time_since_last < self.politeness_delay:
+                if time_since_last < self.politeness_delay:  # wait if not enough time has passed
                     wait_time = self.politeness_delay - time_since_last
                     self.logger.debug(f"Domain politeness: waiting {wait_time:.3f}s before requesting {domain}")
                     time.sleep(wait_time)
-                    current_time = time.time()
+                    current_time = time.time()  # update time after sleep
                 
-                self.domain_last_request[domain] = current_time
+                self.domain_last_request[domain] = current_time  # update last request time
             
             return True
             
@@ -225,7 +201,6 @@ class Frontier(object):
             self.logger.error(f"error checking domain politeness, {e}")
             return True
     
-    # Similarity detection helper
     def _check_if_duplicate(self, fingerprint, normalized_url):
         """
         Check if a page is a duplicate based on its fingerprint.
@@ -234,18 +209,15 @@ class Frontier(object):
         if fingerprint == 0:
             return False
         
-        # Compare against all existing fingerprints
         for existing_url, existing_fingerprint in self.url_to_fingerprint.items():
-            if existing_url != normalized_url and existing_fingerprint != 0:
+            if existing_url != normalized_url and existing_fingerprint != 0:  # skip self and invalid fingerprints
                 if is_duplicate(fingerprint, existing_fingerprint):
                     return True
         
         return False
     
-    # Analysis functionality moved from analysis.py
     def add_page(self, normalized_url, content=None):
         """Add a page to the analysis data using pre-normalized URL"""
-        # CRITICAL: Do expensive content processing OUTSIDE the lock!
         word_count = 0
         filtered_words = []
         if content is not None:
@@ -261,21 +233,21 @@ class Frontier(object):
             host = parsed.netloc.lower()
         
         with self.frontier_lock:
-            if normalized_url not in self.unique_urls:
+            if normalized_url not in self.unique_urls:  # only process each URL once
                 self.unique_urls.add(normalized_url)
                 
                 if host:
-                    # Count by hostname (e.g., vision.ics.uci.edu), not scheme/path
                     self.subdomain_counts[host] += 1
                 
-                if content is not None and word_count >= 50:
+                if content is not None and word_count >= 50:  # only process pages with sufficient content
                     is_duplicate_page = self._check_if_duplicate(fingerprint, normalized_url)
                     
-                    if is_duplicate_page:
+                    if is_duplicate_page:  # skip storing duplicate content, just return count
                         self.duplicate_pages.add(normalized_url)
                         self.logger.debug(f"Duplicate page detected: {normalized_url}")
                         return word_count
                     
+                    # Store fingerprint, content, and word count for analysis
                     self.url_to_fingerprint[normalized_url] = fingerprint
                     self.page_contents[normalized_url] = content
                     self.url_to_word_count[normalized_url] = word_count
@@ -283,17 +255,16 @@ class Frontier(object):
                     for word in filtered_words:
                         self.word_counts[word] += 1
 
-                elif content is not None and word_count < 50:   # For low-value pages, retrieve their path and black-list it
-                    link_without_page: str = get_deepest_link(normalized_url)
+                elif content is not None and word_count < 50:  # mark low-value directories
+                    link_without_page: str = get_deepest_link(normalized_url)  # get directory path
                     url_path: list[str] = urlparse(link_without_page).path
 
                     if(len(url_path) > 1):
                         split_path = url_path[1:].split("/")
-                        if(len(split_path) >= 3):    # can change this
-                            self.low_info_dirs.add(link_without_page)                
+                        if(len(split_path) >= 3):  # 3+ path segments indicates low-info directory
+                            self.low_info_dirs.add(link_without_page)  # blacklist this directory                
                 
-                # Save analysis data periodically (every 100 pages)
-                if len(self.unique_urls) % 100 == 0:
+                if len(self.unique_urls) % 100 == 0:  # periodic save every 100 pages
                     self._save_analysis_data()
         
         return word_count
@@ -320,12 +291,10 @@ class Frontier(object):
         for host, count in self.subdomain_counts.items():
             if host.endswith(".uci.edu") or host == "uci.edu":
                 uci_subdomains[host] = count
-        # Return alphabetically sorted by hostname
         return sorted(uci_subdomains.items(), key=lambda item: item[0])
     
     def generate_report(self, output_file="crawler_report.txt"):
         """Generate a comprehensive crawler report"""
-        # Save final analysis data
         self._save_analysis_data()
         
         report_lines = []
@@ -340,7 +309,6 @@ class Frontier(object):
             report_lines.append(f"   {i:2d}. {word:<15} ({count} occurrences)")
         report_lines.append("")
         
-        # Print subdomains in required format: "subdomain, number" sorted alphabetically
         report_lines.append("uci.edu subdomains:")
         for host, count in self.get_subdomain_stats():
             report_lines.append(f"{host}, {count}")

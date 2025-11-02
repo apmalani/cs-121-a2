@@ -36,7 +36,7 @@ def normalize(url):
     try:
         parsed = urlparse(url)
         
-        if '#' in url:
+        if '#' in url:  # remove fragment (anchor links)
             url = url.split('#')[0]
             parsed = urlparse(url)
         
@@ -45,15 +45,15 @@ def normalize(url):
         path = parsed.path
         query = parsed.query
         
-        if netloc.startswith('www.'):
+        if netloc.startswith('www.'):  # remove www prefix for consistency
             netloc = netloc[4:]
         
-        if path.endswith('/') and path != '/':
+        if path.endswith('/') and path != '/':  # remove trailing slash except for root
             path = path.rstrip('/')
-        elif path == '':
+        elif path == '':  # empty path becomes root
             path = '/'
         
-        if scheme in ('http', 'https'):
+        if scheme in ('http', 'https'):  # standardize to https
             scheme = 'https'
         
         normalized = f"{scheme}://{netloc}{path}"
@@ -65,11 +65,12 @@ def normalize(url):
     except Exception:
         return url.split('#')[0] if '#' in url else url
 
-# used for loop-detection
+# used for loop-detection - groups URLs by domain + first 2 path segments to prevent trap detection
 def get_subdomain(url) -> str:
     '''returns up until the subdomain of a url assuming it has been normalized
-        example: get_subdomain(self, "https://ics.uci.edu/~eppstein/pix/ham/Sara2.html) will return
-        "https://ics.uci/edu/~eppstein/pix"
+        Used to detect when we're stuck in a URL trap (e.g., calendar pages)
+        example: get_subdomain("https://ics.uci.edu/~eppstein/pix/ham/Sara2.html") will return
+        "https://ics.uci.edu/~eppstein/pix/"
     '''
     parsed = urlparse(url)
 
@@ -77,7 +78,7 @@ def get_subdomain(url) -> str:
     netloc = parsed.netloc  # ics.uci.edu
     path = parsed.path  # /~eppstein/pix/ham/Sara2.html
 
-    if path.startswith('/') and len(path) > 1: # checks if there is even a subdomain to begin with
+    if path.startswith('/') and len(path) > 1:
         split_path: list[str] = path[1:].split("/")
 
         if(len(split_path) == 1):   # if path = /~eppstein/, new path is itself
@@ -88,7 +89,10 @@ def get_subdomain(url) -> str:
     return f"{scheme}://{netloc}{path}"
 
 def get_deepest_link(url) -> str:
-    '''returns the deepest link of a url without the html file'''
+    '''returns the directory path (deepest link without the HTML file)
+        Used to blacklist entire directories when they consistently produce low-value pages
+        example: get_deepest_link("https://ics.uci.edu/path/to/page.html") returns "https://ics.uci.edu/path/to/"
+    '''
     parsed = urlparse(url)
 
     scheme = parsed.scheme # https
@@ -104,7 +108,7 @@ def get_deepest_link(url) -> str:
         path = "/"
     else:
         path = "/"
-        for i in range(0, len(split_path) - 1):
+        for i in range(0, len(split_path) - 1):  # exclude last element (the HTML file)
             path += split_path[i] + "/"
 
     return f"{scheme}://{netloc}{path}"
@@ -132,7 +136,7 @@ def process_content(content):
         if len(word) > 2 and word not in stopwords:
             filtered_words.append(word)
 
-    return len(words), filtered_words
+    return len(words), filtered_words  # returns total word count and filtered list (words > 2 chars, not stopwords)
 
 
 def compute_simhash(content, hash_bits=64):
@@ -165,14 +169,14 @@ def compute_simhash(content, hash_bits=64):
         for word in features:
             word_hash = hash(word) & ((1 << hash_bits) - 1)
             for i in range(hash_bits):
-                if word_hash & (1 << i):
+                if word_hash & (1 << i):  # increment if bit is set, decrement otherwise
                     bit_counts[i] += 1
                 else:
                     bit_counts[i] -= 1
         simhash = 0
 
         for i in range(hash_bits):
-            if bit_counts[i] >= 0:
+            if bit_counts[i] >= 0:  # majority vote: set bit if more words had it set
                 simhash |= (1 << i)
                 
         return simhash
@@ -196,10 +200,8 @@ def hamming_distance(hash1, hash2):
     if hash1 == 0 and hash2 == 0:
         return 0
     
-    # XOR to find differing bits
     diff = hash1 ^ hash2
     
-    # Count set bits
     count = 0
     while diff:
         count += diff & 1

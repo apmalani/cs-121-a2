@@ -27,10 +27,8 @@ class Crawler(object):
         self.join()
 
     def join(self):
-        # Wait for all workers to finish
         for worker in self.workers:
             worker.join()
         
-        # Generate report once after all workers are done
         self.logger.info("All workers finished. Generating final report...")
         self.frontier.generate_report()

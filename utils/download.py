@@ -28,12 +28,12 @@ def download(url, config, logger=None):
             logger.error(f"Timeout after {timeout}s for {url}.")
         return Response({
             "error": f"Request timeout after {timeout}s.",
-            "status": 504,  # Gateway Timeout
+            "status": 504,
             "url": url})
     except requests.RequestException as e:
         if logger:
             logger.error(f"Request error for {url}: {e}.")
         return Response({
             "error": f"Request error: {str(e)}",
-            "status": 503,  # Service Unavailable
+            "status": 503,
             "url": url})

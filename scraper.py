@@ -14,7 +14,6 @@ FILE_EXTENSION_PATTERN = re.compile(
     + r"|rm|smil|wmv|swf|wma|zip|rar|gz)$"
 )
 
-# Only allow these bases and their subdomains
 ALLOWED_SUFFIXES = (
     "ics.uci.edu",
     "cs.uci.edu",
@@ -22,15 +21,13 @@ ALLOWED_SUFFIXES = (
     "stat.uci.edu",
 )
 
-# Blacklisted words - URLs containing any of these should be skipped
 URL_BLACKLIST = {"week", "year", "month", "ical", "doku", "tribe", "twitter", "facebook", "instagram", "youtube"}
 _SKIP_SCHEMES = ("mailto:", "javascript:", "tel:")
 
 def scraper(url, resp, frontier):
-    # URL is already normalized when it comes from frontier
-    normalized_url = url
+    normalized_url = url  # URL already normalized when coming from frontier
     
-    if normalized_url in frontier.unique_urls:
+    if normalized_url in frontier.unique_urls:  # skip if already processed
         return []
         
     links = extract_next_links(url, resp)
@@ -41,9 +38,9 @@ def scraper(url, resp, frontier):
             content = resp.raw_response.content.decode('utf-8', errors='ignore')
             word_count = frontier.add_page(normalized_url, content)
         except Exception as e:
-            word_count = frontier.add_page(normalized_url)
+            word_count = frontier.add_page(normalized_url)  # fallback: track without content
     else:
-        word_count = frontier.add_page(normalized_url)
+        word_count = frontier.add_page(normalized_url)  # track page even if download failed
     
     # Only add links to frontier if page has at least 50 words
     if word_count < 50:
@@ -54,7 +51,7 @@ def scraper(url, resp, frontier):
         if is_valid(link):
             normalized_link = normalize(link)
             if normalized_link not in frontier.unique_urls:
-                valid_links.append(link)  # Return original link for frontier.add_url
+                valid_links.append(link)  # return original link (not normalized) for frontier.add_url
     
     return valid_links
 
@@ -78,7 +75,7 @@ def extract_next_links(url, resp):
             absolute_url = urljoin(resp.url, href)
             if '#' in absolute_url:
                 absolute_url = absolute_url.split('#', 1)[0]
-            if '?' in absolute_url and ('=' not in absolute_url and '&' not in absolute_url):
+            if '?' in absolute_url and ('=' not in absolute_url and '&' not in absolute_url):  # remove empty query strings
                 absolute_url = absolute_url.split('?', 1)[0]
             links.append(absolute_url)
             
@@ -92,7 +89,6 @@ def is_valid(url):
     if len(url) > 200:
         return False
     
-    # Check if URL contains any blacklisted words (case-insensitive)
     url_lower = url.lower()
     for blacklisted_word in URL_BLACKLIST:
         if blacklisted_word in url_lower:
@@ -105,21 +101,20 @@ def is_valid(url):
             return False
 
         netloc_lower = parsed.netloc.lower()
-        # Allow only the four specified bases (including www) and their subdomains
+        # Check if domain matches allowed suffix exactly, with www, or as a subdomain
         if not any(
-            netloc_lower == suffix or
-            netloc_lower == ("www." + suffix) or
-            netloc_lower.endswith('.' + suffix)
+            netloc_lower == suffix or  # exact match (e.g., "ics.uci.edu")
+            netloc_lower == ("www." + suffix) or  # www prefix (e.g., "www.ics.uci.edu")
+            netloc_lower.endswith('.' + suffix)  # subdomain (e.g., "vision.ics.uci.edu")
             for suffix in ALLOWED_SUFFIXES
         ):
             return False
         
-        path_lower = parsed.path.lower()  # Reuse lowercase path for both checks
-        if FILE_EXTENSION_PATTERN.match(path_lower):
+        path_lower = parsed.path.lower()
+        if FILE_EXTENSION_PATTERN.match(path_lower):  # reject file extensions (images, docs, etc.)
             return False
             
-        # Optimize depth check - count '/' instead of splitting
-        if path_lower.count('/') > 10:
+        if path_lower.count('/') > 10:  # reject URLs that are too deep
             return False
         
         return True
