@@ -257,11 +257,11 @@ class Frontier(object):
 
                 elif content is not None and word_count < 50:  # mark low-value directories
                     link_without_page: str = get_deepest_link(normalized_url)  # get directory path
-                    url_path: list[str] = urlparse(link_without_page).path
+                    url_path: str = urlparse(link_without_page).path
 
                     if(len(url_path) > 1):
-                        split_path = url_path[1:].split("/")
-                        if(len(split_path) >= 3):  # 3+ path segments indicates low-info directory
+                        split_path = url_path[1:].split("/")  # split into path segments (skip leading '/')
+                        if(len(split_path) >= 3 or (len(split_path) >= 2 and "events" in split_path)):
                             self.low_info_dirs.add(link_without_page)  # blacklist this directory                
                 
                 if len(self.unique_urls) % 100 == 0:  # periodic save every 100 pages
