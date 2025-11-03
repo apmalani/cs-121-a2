@@ -21,7 +21,7 @@ ALLOWED_SUFFIXES = (
     "stat.uci.edu",
 )
 
-URL_BLACKLIST = {"week", "year", "month", "ical", "doku", "tribe", "twitter", "facebook", "instagram", "youtube"}
+URL_BLACKLIST = {"week", "year", "month", "ical", "doku", "tribe", "twitter", "facebook", "instagram", "youtube", "events"}
 _SKIP_SCHEMES = ("mailto:", "javascript:", "tel:")
 
 def scraper(url, resp, frontier):
