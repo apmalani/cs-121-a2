@@ -1,0 +1,207 @@
+unique pages found: 14586
+longest page: https://ics.uci.edu/~kay/wordlist.txt 475850
+50 most common words:
+    1. research        (28690 occurrences)
+    2. ics             (18857 occurrences)
+    3. computer        (18231 occurrences)
+    4. student         (17855 occurrences)
+    5. data            (15919 occurrences)
+    6. information     (14908 occurrences)
+    7. students        (14380 occurrences)
+    8. uci             (14191 occurrences)
+    9. software        (13657 occurrences)
+   10. science         (13288 occurrences)
+   11. can             (12971 occurrences)
+   12. will            (12841 occurrences)
+   13. graduate        (12509 occurrences)
+   14. learning        (12208 occurrences)
+   15. undergraduate   (12130 occurrences)
+   16. informatics     (11975 occurrences)
+   17. news            (11748 occurrences)
+   18. irvine          (11601 occurrences)
+   19. may             (11558 occurrences)
+   20. markellekelly   (11125 occurrences)
+   21. time            (10687 occurrences)
+   22. ramesh          (10635 occurrences)
+   23. engineering     (9987 occurrences)
+   24. university      (9802 occurrences)
+   25. one             (9710 occurrences)
+   26. projects        (9147 occurrences)
+   27. computing       (8951 occurrences)
+   28. people          (8803 occurrences)
+   29. systems         (8512 occurrences)
+   30. search          (8464 occurrences)
+   31. faculty         (8358 occurrences)
+   32. values          (8134 occurrences)
+   33. new             (8020 occurrences)
+   34. september       (8009 occurrences)
+   35. design          (7921 occurrences)
+   36. june            (7880 occurrences)
+   37. project         (7853 occurrences)
+   38. courses         (7774 occurrences)
+   39. july            (7591 occurrences)
+   40. events          (7572 occurrences)
+   41. past            (7313 occurrences)
+   42. insert          (7244 occurrences)
+   43. august          (7239 occurrences)
+   44. read            (7221 occurrences)
+   45. alumni          (7208 occurrences)
+   46. march           (7046 occurrences)
+   47. april           (7043 occurrences)
+   48. october         (7009 occurrences)
+   49. department      (7006 occurrences)
+   50. january         (6970 occurrences)
+
+uci.edu subdomains:
+accessibility.ics.uci.edu, 6
+acoi.ics.uci.edu, 114
+aiclub.ics.uci.edu, 1
+archive-beta.ics.uci.edu, 11
+archive.ics.uci.edu, 198
+asterix.ics.uci.edu, 13
+asterixdb.ics.uci.edu, 2
+auge.ics.uci.edu, 1
+betapro.proteomics.ics.uci.edu, 3
+capstone.cs.uci.edu, 8
+cbcl.ics.uci.edu, 1
+cdb.ics.uci.edu, 46
+cert.ics.uci.edu, 35
+cgvw.ics.uci.edu, 1
+checkmate.ics.uci.edu, 2
+chemdb.ics.uci.edu, 45
+chenli.ics.uci.edu, 10
+cherry.ics.uci.edu, 1
+chime.ics.uci.edu, 1
+circadiomics.ics.uci.edu, 9
+closeup.ics.uci.edu, 1
+cloudberry.ics.uci.edu, 44
+cml.ics.uci.edu, 221
+cocoa-krispies.ics.uci.edu, 1
+code.ics.uci.edu, 13
+computableplant.ics.uci.edu, 113
+contact.ics.uci.edu, 2
+contact14.ics.uci.edu, 1
+courselisting.ics.uci.edu, 2
+create.ics.uci.edu, 4
+cs.ics.uci.edu, 13
+cs.uci.edu, 23
+cwicsocal18.ics.uci.edu, 10
+cyberclub.ics.uci.edu, 11
+cybert.ics.uci.edu, 28
+dataguard.ics.uci.edu, 1
+datalab.ics.uci.edu, 1
+dataprotector.ics.uci.edu, 1
+dblp.ics.uci.edu, 2
+deeprxn.ics.uci.edu, 30
+dgillen.ics.uci.edu, 32
+ds4all.ics.uci.edu, 5
+duke.ics.uci.edu, 1
+duttgroup.ics.uci.edu, 135
+dynamo.ics.uci.edu, 35
+edgelab.ics.uci.edu, 7
+emj-pc.ics.uci.edu, 1
+emj.ics.uci.edu, 45
+esl.ics.uci.edu, 1
+evoke.ics.uci.edu, 5
+fano.ics.uci.edu, 47
+flamingo.ics.uci.edu, 32
+fr.ics.uci.edu, 10
+frost.ics.uci.edu, 2
+futurehealth.ics.uci.edu, 108
+gbolcer.ics.uci.edu, 1
+gonet.genomics.ics.uci.edu, 1
+grape.ics.uci.edu, 1378
+graphics.ics.uci.edu, 13
+graphmod.ics.uci.edu, 14
+hack.ics.uci.edu, 2
+hai.ics.uci.edu, 7
+hana.ics.uci.edu, 3
+hobbes.ics.uci.edu, 11
+hombao.ics.uci.edu, 1
+honors.ics.uci.edu, 1
+hpi.ics.uci.edu, 5
+i-sensorium.ics.uci.edu, 6
+iasl.ics.uci.edu, 2
+ibook.ics.uci.edu, 1
+icde2023.ics.uci.edu, 47
+ics.uci.edu, 6208
+industryshowcase.ics.uci.edu, 23
+informatics.ics.uci.edu, 2
+informatics.mt-live.ics.uci.edu, 1
+informatics.uci.edu, 1168
+insite.ics.uci.edu, 10
+intranet.ics.uci.edu, 1
+ipubmed.ics.uci.edu, 1
+isg.ics.uci.edu, 252
+jgarcia.ics.uci.edu, 40
+jujube.ics.uci.edu, 2
+kdd.ics.uci.edu, 3
+labbie.ics.uci.edu, 1
+luci.ics.uci.edu, 5
+mailman.ics.uci.edu, 41
+malek.ics.uci.edu, 1
+mapgrid.ics.uci.edu, 2
+mcs.ics.uci.edu, 12
+mdogucu.ics.uci.edu, 2
+mds.ics.uci.edu, 9
+metaviz.ics.uci.edu, 1
+mhcid.ics.uci.edu, 20
+mhcis.ics.uci.edu, 1
+mine10.ics.uci.edu, 1
+mlphysics.ics.uci.edu, 17
+mondego.ics.uci.edu, 1
+motifmap-rna.ics.uci.edu, 1
+motifmap.ics.uci.edu, 2
+mse.ics.uci.edu, 1
+mswe.ics.uci.edu, 11
+mt-live.ics.uci.edu, 1
+mupro.proteomics.ics.uci.edu, 3
+nalini.ics.uci.edu, 7
+ngs.ics.uci.edu, 2851
+oai.ics.uci.edu, 5
+old-reactions.ics.uci.edu, 1
+password.ics.uci.edu, 1
+pasteur.ics.uci.edu, 2
+pepito.proteomics.ics.uci.edu, 1
+plrg.ics.uci.edu, 84
+psearch.ics.uci.edu, 5
+radicle.ics.uci.edu, 6
+reactions.ics.uci.edu, 1
+redmiles.ics.uci.edu, 7
+riscit.ics.uci.edu, 1
+satware.ics.uci.edu, 1
+scale.ics.uci.edu, 7
+scratch.proteomics.ics.uci.edu, 4
+sdcl.ics.uci.edu, 1
+seal.ics.uci.edu, 54
+selectpro.proteomics.ics.uci.edu, 4
+seraja.ics.uci.edu, 1
+sherlock.ics.uci.edu, 8
+sidepro.proteomics.ics.uci.edu, 1
+sli.ics.uci.edu, 7
+sourcerer.ics.uci.edu, 1
+sprout.ics.uci.edu, 1
+stairs.ics.uci.edu, 4
+stat.ics.uci.edu, 18
+stat.uci.edu, 88
+statconsulting.ics.uci.edu, 1
+statistics-stage.ics.uci.edu, 1
+student-council.ics.uci.edu, 7
+studentcouncil.ics.uci.edu, 7
+students.ics.uci.edu, 1
+summeracademy.ics.uci.edu, 6
+tad.ics.uci.edu, 3
+tastier.ics.uci.edu, 1
+tippers.ics.uci.edu, 1
+tippersweb.ics.uci.edu, 1
+tmbpro.ics.uci.edu, 1
+transformativeplay.ics.uci.edu, 14
+tutoring.ics.uci.edu, 5
+tutors.ics.uci.edu, 1
+ugradforms.ics.uci.edu, 1
+unite.ics.uci.edu, 10
+vision.ics.uci.edu, 212
+wics.ics.uci.edu, 258
+wiki.ics.uci.edu, 1
+www-db.ics.uci.edu, 43
+xtune.ics.uci.edu, 6

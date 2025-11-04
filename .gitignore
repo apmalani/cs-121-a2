@@ -111,4 +111,3 @@ venv
 *.shelve
 
 Logs/
-crawler_report.txt
